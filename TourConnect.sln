@@ -9,6 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildingBlocks", "BuildingB
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "src\BuildingBlocks\Common\Common.csproj", "{CFE190F2-24AA-4428-8F80-3B92B111D1BC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventBus.Messages", "src\BuildingBlocks\EventBus.Messages\EventBus.Messages.csproj", "{5315090E-48CB-4B39-87B8-A807ECB55A44}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -31,6 +33,18 @@ Global
 		{CFE190F2-24AA-4428-8F80-3B92B111D1BC}.Release|x64.Build.0 = Release|Any CPU
 		{CFE190F2-24AA-4428-8F80-3B92B111D1BC}.Release|x86.ActiveCfg = Release|Any CPU
 		{CFE190F2-24AA-4428-8F80-3B92B111D1BC}.Release|x86.Build.0 = Release|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Debug|x64.Build.0 = Debug|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Debug|x86.Build.0 = Debug|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Release|x64.ActiveCfg = Release|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Release|x64.Build.0 = Release|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Release|x86.ActiveCfg = Release|Any CPU
+		{5315090E-48CB-4B39-87B8-A807ECB55A44}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -38,5 +52,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{90298CBA-BD6F-3A0A-69D5-97CAD7B05E7E} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{CFE190F2-24AA-4428-8F80-3B92B111D1BC} = {90298CBA-BD6F-3A0A-69D5-97CAD7B05E7E}
+		{5315090E-48CB-4B39-87B8-A807ECB55A44} = {90298CBA-BD6F-3A0A-69D5-97CAD7B05E7E}
 	EndGlobalSection
 EndGlobal
