@@ -4,50 +4,56 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using TourConnect.Prototype.Data;
 
 #nullable disable
 
 namespace TourConnect.Prototype.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260323165108_AddPartnersAndReservations")]
-    partial class AddPartnersAndReservations
+    [Migration("20260323212736_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "8.0.25");
+            modelBuilder
+                .HasAnnotation("ProductVersion", "8.0.25")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            modelBuilder.Entity("Deal", b =>
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("TourConnect.Prototype.Models.Deal", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("AvailableSlots")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("DiscountedPrice")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("OperatorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("OriginalPrice")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("TourId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -56,88 +62,88 @@ namespace TourConnect.Prototype.Migrations
                     b.ToTable("Deals");
                 });
 
-            modelBuilder.Entity("Operator", b =>
+            modelBuilder.Entity("TourConnect.Prototype.Models.Operator", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Location")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Phone")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.ToTable("Operators");
                 });
 
-            modelBuilder.Entity("Partner", b =>
+            modelBuilder.Entity("TourConnect.Prototype.Models.Partner", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ContactEmail")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Location")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.ToTable("Partners");
                 });
 
-            modelBuilder.Entity("Reservation", b =>
+            modelBuilder.Entity("TourConnect.Prototype.Models.Reservation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("DealId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("GuestCount")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("GuestName")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("PartnerId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -148,34 +154,34 @@ namespace TourConnect.Prototype.Migrations
                     b.ToTable("Reservations");
                 });
 
-            modelBuilder.Entity("Tour", b =>
+            modelBuilder.Entity("TourConnect.Prototype.Models.Tour", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("BasePrice")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<int>("Category")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<int>("DurationInHours")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("OperatorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -184,9 +190,9 @@ namespace TourConnect.Prototype.Migrations
                     b.ToTable("Tours");
                 });
 
-            modelBuilder.Entity("Deal", b =>
+            modelBuilder.Entity("TourConnect.Prototype.Models.Deal", b =>
                 {
-                    b.HasOne("Tour", "Tour")
+                    b.HasOne("TourConnect.Prototype.Models.Tour", "Tour")
                         .WithMany()
                         .HasForeignKey("TourId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -195,15 +201,15 @@ namespace TourConnect.Prototype.Migrations
                     b.Navigation("Tour");
                 });
 
-            modelBuilder.Entity("Reservation", b =>
+            modelBuilder.Entity("TourConnect.Prototype.Models.Reservation", b =>
                 {
-                    b.HasOne("Deal", "Deal")
+                    b.HasOne("TourConnect.Prototype.Models.Deal", "Deal")
                         .WithMany()
                         .HasForeignKey("DealId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Partner", "Partner")
+                    b.HasOne("TourConnect.Prototype.Models.Partner", "Partner")
                         .WithMany("Reservations")
                         .HasForeignKey("PartnerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -214,9 +220,9 @@ namespace TourConnect.Prototype.Migrations
                     b.Navigation("Partner");
                 });
 
-            modelBuilder.Entity("Tour", b =>
+            modelBuilder.Entity("TourConnect.Prototype.Models.Tour", b =>
                 {
-                    b.HasOne("Operator", "Operator")
+                    b.HasOne("TourConnect.Prototype.Models.Operator", "Operator")
                         .WithMany("Tours")
                         .HasForeignKey("OperatorId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -225,12 +231,12 @@ namespace TourConnect.Prototype.Migrations
                     b.Navigation("Operator");
                 });
 
-            modelBuilder.Entity("Operator", b =>
+            modelBuilder.Entity("TourConnect.Prototype.Models.Operator", b =>
                 {
                     b.Navigation("Tours");
                 });
 
-            modelBuilder.Entity("Partner", b =>
+            modelBuilder.Entity("TourConnect.Prototype.Models.Partner", b =>
                 {
                     b.Navigation("Reservations");
                 });

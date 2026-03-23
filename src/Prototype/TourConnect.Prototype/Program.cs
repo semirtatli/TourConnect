@@ -18,9 +18,12 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// EF Core + SQLite
+// EF Core + PostgreSQL
+// GetConnectionString("DefaultConnection") → appsettings.json'daki
+// ConnectionStrings.DefaultConnection değerini okur.
+// Prod'da bu değer environment variable ile ezilir (güvenli).
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=tourconnect.db"));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
