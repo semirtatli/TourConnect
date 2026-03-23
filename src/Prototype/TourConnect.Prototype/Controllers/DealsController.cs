@@ -1,3 +1,6 @@
+using TourConnect.Prototype.Data;
+using TourConnect.Prototype.Models;
+
 namespace TourConnect.Prototype.Controllers;
 
 [ApiController]

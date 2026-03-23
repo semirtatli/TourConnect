@@ -1,3 +1,5 @@
+using TourConnect.Prototype.Models;
+
 namespace TourConnect.Prototype.Data;
 
 // AppDbContext: EF Core'un veritabanıyla konuştuğu köprü sınıf.
