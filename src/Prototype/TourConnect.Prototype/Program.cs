@@ -247,6 +247,16 @@ app.MapPost("/api/reservations", async (CreateReservationRequest request, AppDbC
     if (deal.Status != DealStatus.Active)
         return Results.BadRequest($"Bu deal rezervasyon kabul etmiyor. Durum: {deal.Status}");
 
+    // GET /api/deals her istekte expired kontrolü yapıyor ama rezervasyon
+    // endpoint'i doğrudan çağrılabilir. Burada anlık kontrol ekliyoruz:
+    // süresi geçmişse önce DB'de Expired yap, sonra reddet.
+    if (deal.ExpiresAt <= DateTime.UtcNow)
+    {
+        deal.Status = DealStatus.Expired;
+        await db.SaveChangesAsync();
+        return Results.BadRequest("Deal süresi dolmuş.");
+    }
+
     // Partner'ın var olduğunu kontrol et
     var partner = await db.Partners.FindAsync(request.PartnerId);
     if (partner is null)
