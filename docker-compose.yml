@@ -1,0 +1,41 @@
+services:
+
+  # =====================================================================
+  # PostgreSQL veritabanı
+  # Şifreler .env dosyasından okunur (.gitignore'da — commit edilmez).
+  # =====================================================================
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # "HOST_PORT:CONTAINER_PORT"
+      # 5435 → dışarıdan bağlanmak için (5432 ve 5433 zaten dolu)
+      # 5432 → container içinde postgres'in dinlediği port (değişmez)
+      - "5435:5432"
+    healthcheck:
+      # pg_isready: postgres bağlantı kabul ediyor mu diye soran araç
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =====================================================================
+  # Uygulama
+  # =====================================================================
+  app:
+    build:
+      context: .
+      dockerfile: src/Prototype/TourConnect.Prototype/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # (__) çift alt çizgi = JSON'daki iç içe yapı (: yerine __)
+      # Host=postgres → Docker Compose servisler birbirini ismiyle bulur.
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
