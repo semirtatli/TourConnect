@@ -117,6 +117,93 @@ app.MapPost("/api/tours", async (CreateTourRequest request, AppDbContext db) =>
     return Results.Created($"/api/tours/{tour.Id}", tour);
 });
 
+// GET /api/deals → Sadece aktif deal'leri listele
+// Burada iki iş yapıyoruz:
+//   1. Süresi geçmiş deal'leri Expired yap (expiry kontrolü)
+//   2. Hâlâ Active olanları döndür
+// Not: Bu "request anında kontrol" yöntemi. Faz 1'de bunu background service'e taşıyacağız.
+app.MapGet("/api/deals", async (AppDbContext db) =>
+{
+    // Süresi geçmiş ama hâlâ Active görünen deal'leri bul
+    // DateTime.UtcNow → sunucunun şu anki zamanı (UTC, timezone farkı olmadan)
+    // Where() → SQL WHERE koşulu
+    var expiredDeals = await db.Deals
+        .Where(d => d.ExpiresAt < DateTime.UtcNow && d.Status == DealStatus.Active)
+        .ToListAsync();
+
+    // Bulunanları Expired yap ve kaydet
+    foreach (var deal in expiredDeals)
+        deal.Status = DealStatus.Expired;
+
+    // Değişiklik varsa DB'ye yaz (yoksa boşuna sorgu atmaz)
+    if (expiredDeals.Count > 0)
+        await db.SaveChangesAsync();
+
+    // Artık sadece Active deal'leri getir, Tour bilgisiyle birlikte
+    return await db.Deals
+        .Where(d => d.Status == DealStatus.Active)
+        .Include(d => d.Tour)           // JOIN tours
+            .ThenInclude(t => t.Operator) // JOIN operators (tour üzerinden)
+        .ToListAsync();
+});
+
+// POST /api/deals → Yeni last-minute fırsat oluştur
+app.MapPost("/api/deals", async (CreateDealRequest request, AppDbContext db) =>
+{
+    // Turun var olduğunu kontrol et
+    var tour = await db.Tours.FindAsync(request.TourId);
+    if (tour is null)
+        return Results.NotFound($"Tur bulunamadı: {request.TourId}");
+
+    // İş kuralı: indirimli fiyat orijinal fiyattan düşük olmalı
+    if (request.DiscountedPrice >= request.OriginalPrice)
+        return Results.BadRequest("İndirimli fiyat orijinal fiyattan düşük olmalı.");
+
+    // İş kuralı: bitiş zamanı gelecekte olmalı
+    if (request.ExpiresAt <= DateTime.UtcNow)
+        return Results.BadRequest("Bitiş zamanı gelecekte olmalı.");
+
+    // İş kuralı: en az 1 slot olmalı
+    if (request.AvailableSlots <= 0)
+        return Results.BadRequest("En az 1 slot olmalı.");
+
+    var deal = new Deal
+    {
+        TourId = request.TourId,
+        OperatorId = tour.OperatorId,       // turu kim veriyorsa o operatör
+        AvailableSlots = request.AvailableSlots,
+        OriginalPrice = request.OriginalPrice,
+        DiscountedPrice = request.DiscountedPrice,
+        ExpiresAt = request.ExpiresAt,
+        Status = DealStatus.Active          // yeni deal her zaman Active başlar
+    };
+
+    db.Deals.Add(deal);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/api/deals/{deal.Id}", deal);
+});
+
+// PUT /api/deals/{id}/cancel → Operatör fırsatı iptal eder
+// PUT = "bu kaydı güncelle" anlamındaki HTTP metodu
+// {id} → URL'den gelen parametre: /api/deals/abc-123/cancel
+app.MapPut("/api/deals/{id}/cancel", async (Guid id, AppDbContext db) =>
+{
+    var deal = await db.Deals.FindAsync(id);
+
+    if (deal is null)
+        return Results.NotFound($"Deal bulunamadı: {id}");
+
+    // Sadece Active deal iptal edilebilir
+    if (deal.Status != DealStatus.Active)
+        return Results.BadRequest($"Bu deal iptal edilemez. Mevcut durum: {deal.Status}");
+
+    deal.Status = DealStatus.Cancelled;
+    await db.SaveChangesAsync();
+
+    return Results.Ok(deal);
+});
+
 app.Run(); // Uygulamayı başlat, HTTP isteklerini dinlemeye başla
 
 // =====================================================================
@@ -170,6 +257,46 @@ public class Tour
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+// DealStatus: Deal'in anlık durumu.
+// Enum kullanıyoruz çünkü bu 4 değerin dışında bir şey olamaz.
+public enum DealStatus
+{
+    Active,       // 0 → yayında, rezervasyon yapılabilir
+    Expired,      // 1 → süresi doldu, otomatik geçiş
+    FullyBooked,  // 2 → tüm slotlar doldu
+    Cancelled     // 3 → operatör iptal etti
+}
+
+// Deal: Bir tura ait last-minute fırsat.
+// Tour ile ilişkili ama bağımsız bir yaşam döngüsü var.
+// Aynı tura birden fazla deal açılabilir (farklı günler için).
+public class Deal
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    // Hangi tura ait? (foreign key)
+    public Guid TourId { get; set; }
+    public Tour Tour { get; set; } = null!;  // navigation property
+
+    // Turu kim veriyor? (kolaylık için saklıyoruz — Tour.OperatorId ile aynı)
+    public Guid OperatorId { get; set; }
+
+    // Kaç kişilik yer var? Rezervasyon yapıldıkça azalır.
+    public int AvailableSlots { get; set; }
+
+    // decimal → para için doğru tip (float/double yuvarlama hatası yapar)
+    public decimal OriginalPrice { get; set; }
+    public decimal DiscountedPrice { get; set; }
+
+    // Bu zamandan sonra deal geçersiz sayılır
+    public DateTime ExpiresAt { get; set; }
+
+    // Şu anki durum. Her zaman Active olarak başlar.
+    public DealStatus Status { get; set; } = DealStatus.Active;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 // AppDbContext: EF Core'un veritabanıyla konuştuğu köprü sınıf.
 // Her DbSet<T> bir DB tablosuna karşılık gelir.
 public class AppDbContext : DbContext
@@ -177,7 +304,8 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     public DbSet<Operator> Operators => Set<Operator>();
-    public DbSet<Tour> Tours => Set<Tour>(); // ← yeni eklendi
+    public DbSet<Tour> Tours => Set<Tour>();
+    public DbSet<Deal> Deals => Set<Deal>(); // ← yeni eklendi
 }
 
 // Request DTO'lar: POST endpoint'lerine gelen JSON'un şekli.
@@ -191,4 +319,12 @@ public record CreateTourRequest(
     TourCategory Category,  // JSON'da 0,1,2 veya "BoatTour","Safari" gönderilebilir
     int DurationInHours,
     decimal BasePrice
+);
+
+public record CreateDealRequest(
+    Guid TourId,            // hangi tura ait
+    int AvailableSlots,     // kaç kişilik yer var
+    decimal OriginalPrice,  // normal fiyat
+    decimal DiscountedPrice,// indirimli fiyat (< OriginalPrice olmalı)
+    DateTime ExpiresAt      // ne zaman sona erecek (gelecekte olmalı)
 );
