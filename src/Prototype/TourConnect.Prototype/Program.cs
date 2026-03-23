@@ -1,5 +1,8 @@
 using System.Text.Json.Serialization;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using TourConnect.Prototype.Data;
+using TourConnect.Prototype.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +20,14 @@ builder.Services.AddControllers()
 // AddSwaggerGen → bu meta verilerden /swagger UI'ı oluşturur
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// FluentValidation: tüm validator sınıflarını otomatik bul ve kaydet.
+// AddValidatorsFromAssemblyContaining → belirtilen sınıfın bulunduğu assembly'deki
+// tüm AbstractValidator<T> sınıflarını tarar.
+// AddFluentValidationAutoValidation → [ApiController] ile entegre olur:
+// validation başarısız olunca controller method'u çalışmaz, otomatik 400 döner.
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateDealValidator>();
 
 // EF Core + PostgreSQL
 // GetConnectionString("DefaultConnection") → appsettings.json'daki

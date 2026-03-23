@@ -42,15 +42,8 @@ public class DealsController : ControllerBase
         if (tour is null)
             return NotFound($"Tur bulunamadı: {request.TourId}");
 
-        if (request.DiscountedPrice >= request.OriginalPrice)
-            return BadRequest("İndirimli fiyat orijinal fiyattan düşük olmalı.");
-
-        if (request.ExpiresAt <= DateTime.UtcNow)
-            return BadRequest("Bitiş zamanı gelecekte olmalı.");
-
-        if (request.AvailableSlots <= 0)
-            return BadRequest("En az 1 slot olmalı.");
-
+        // Input validation'lar FluentValidation tarafından yapıldı.
+        // Buraya gelindiyse tüm alanlar geçerli demektir.
         var deal = new Deal
         {
             TourId = request.TourId,
