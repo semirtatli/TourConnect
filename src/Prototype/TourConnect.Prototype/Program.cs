@@ -204,6 +204,85 @@ app.MapPut("/api/deals/{id}/cancel", async (Guid id, AppDbContext db) =>
     return Results.Ok(deal);
 });
 
+// GET /api/partners → Tüm partner otelleri listele
+app.MapGet("/api/partners", async (AppDbContext db) =>
+    await db.Partners.ToListAsync());
+
+// POST /api/partners → Yeni partner otel kaydı
+app.MapPost("/api/partners", async (CreatePartnerRequest request, AppDbContext db) =>
+{
+    var partner = new Partner
+    {
+        Name = request.Name,
+        ContactEmail = request.ContactEmail,
+        Location = request.Location
+    };
+
+    db.Partners.Add(partner);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/api/partners/{partner.Id}", partner);
+});
+
+// GET /api/reservations → Tüm rezervasyonları listele (deal ve partner bilgisiyle)
+app.MapGet("/api/reservations", async (AppDbContext db) =>
+    await db.Reservations
+        .Include(r => r.Deal)       // JOIN deals
+            .ThenInclude(d => d.Tour)   // JOIN tours (deal üzerinden)
+        .Include(r => r.Partner)    // JOIN partners
+        .ToListAsync());
+
+// POST /api/reservations → Yeni rezervasyon oluştur
+// Bu endpoint projenin kalbindeki iş mantığını içeriyor:
+// slot kontrolü + slot düşürme + status yönetimi
+app.MapPost("/api/reservations", async (CreateReservationRequest request, AppDbContext db) =>
+{
+    // Deal'i bul. Active mi? Süresi geçmemiş mi?
+    var deal = await db.Deals.FindAsync(request.DealId);
+    if (deal is null)
+        return Results.NotFound($"Deal bulunamadı: {request.DealId}");
+
+    // Sadece Active deal'e rezervasyon yapılabilir.
+    // Expired, FullyBooked veya Cancelled deal'ler için işlem yapmıyoruz.
+    if (deal.Status != DealStatus.Active)
+        return Results.BadRequest($"Bu deal rezervasyon kabul etmiyor. Durum: {deal.Status}");
+
+    // Partner'ın var olduğunu kontrol et
+    var partner = await db.Partners.FindAsync(request.PartnerId);
+    if (partner is null)
+        return Results.NotFound($"Partner bulunamadı: {request.PartnerId}");
+
+    // Kritik iş kuralı: yeterli slot var mı?
+    // GuestCount = misafir sayısı, AvailableSlots = kalan yer
+    if (deal.AvailableSlots < request.GuestCount)
+        return Results.BadRequest(
+            $"Yeterli slot yok. İstenen: {request.GuestCount}, Mevcut: {deal.AvailableSlots}");
+
+    // Slot düş: rezervasyon onaylandığı anda yer bloke edilir
+    deal.AvailableSlots -= request.GuestCount;
+
+    // Eğer kalan slot 0'a düştüyse deal'i FullyBooked yap.
+    // Artık yeni rezervasyon kabul edilmeyecek.
+    if (deal.AvailableSlots == 0)
+        deal.Status = DealStatus.FullyBooked;
+
+    var reservation = new Reservation
+    {
+        DealId = request.DealId,
+        PartnerId = request.PartnerId,
+        GuestName = request.GuestName,
+        GuestCount = request.GuestCount,
+        // Faz 0'da "anında onayla" → Confirmed.
+        // Faz 4'te bu Pending olacak, saga tamamlanınca Confirmed geçecek.
+        Status = ReservationStatus.Confirmed
+    };
+
+    db.Reservations.Add(reservation);
+    await db.SaveChangesAsync(); // Hem deal güncelleme hem rezervasyon tek transaction'da yazılır
+
+    return Results.Created($"/api/reservations/{reservation.Id}", reservation);
+});
+
 app.Run(); // Uygulamayı başlat, HTTP isteklerini dinlemeye başla
 
 // =====================================================================
@@ -297,6 +376,51 @@ public class Deal
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+// Partner: Rezervasyon yapan otel veya acente.
+// ContactEmail → partner iletişim adresi, bildirimler buraya gider (Faz 1'de).
+public class Partner
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = string.Empty;
+    public string ContactEmail { get; set; } = string.Empty;
+    public string Location { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // Bu partner'ın tüm rezervasyonları (navigation property)
+    public List<Reservation> Reservations { get; set; } = [];
+}
+
+// ReservationStatus: Rezervasyonun anlık durumu.
+// Faz 0: Confirmed veya Cancelled (saga yok, anında onay).
+// Faz 4: Pending eklenecek (saga tamamlanana kadar bekler).
+public enum ReservationStatus
+{
+    Confirmed,  // 0 → slot düşüldü, onaylandı
+    Cancelled   // 1 → iptal edildi (Faz 0'da endpoint yok, ileride eklenecek)
+}
+
+// Reservation: Partner'ın bir deal'e yaptığı rezervasyon.
+// Deal.AvailableSlots bu kayıt oluşunca azalır.
+public class Reservation
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    // Hangi fırsata rezervasyon? (foreign key)
+    public Guid DealId { get; set; }
+    public Deal Deal { get; set; } = null!;
+
+    // Hangi partner yaptı? (foreign key)
+    public Guid PartnerId { get; set; }
+    public Partner Partner { get; set; } = null!;
+
+    public string GuestName { get; set; } = string.Empty; // misafir adı
+    public int GuestCount { get; set; }                    // kaç kişilik
+
+    public ReservationStatus Status { get; set; } = ReservationStatus.Confirmed;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 // AppDbContext: EF Core'un veritabanıyla konuştuğu köprü sınıf.
 // Her DbSet<T> bir DB tablosuna karşılık gelir.
 public class AppDbContext : DbContext
@@ -305,7 +429,9 @@ public class AppDbContext : DbContext
 
     public DbSet<Operator> Operators => Set<Operator>();
     public DbSet<Tour> Tours => Set<Tour>();
-    public DbSet<Deal> Deals => Set<Deal>(); // ← yeni eklendi
+    public DbSet<Deal> Deals => Set<Deal>();
+    public DbSet<Partner> Partners => Set<Partner>();           // ← yeni
+    public DbSet<Reservation> Reservations => Set<Reservation>(); // ← yeni
 }
 
 // Request DTO'lar: POST endpoint'lerine gelen JSON'un şekli.
@@ -327,4 +453,17 @@ public record CreateDealRequest(
     decimal OriginalPrice,  // normal fiyat
     decimal DiscountedPrice,// indirimli fiyat (< OriginalPrice olmalı)
     DateTime ExpiresAt      // ne zaman sona erecek (gelecekte olmalı)
+);
+
+public record CreatePartnerRequest(
+    string Name,
+    string ContactEmail,
+    string Location
+);
+
+public record CreateReservationRequest(
+    Guid DealId,        // hangi fırsata rezervasyon
+    Guid PartnerId,     // hangi partner yapıyor
+    string GuestName,   // misafir adı
+    int GuestCount      // kaç kişilik (deal.AvailableSlots'tan düşülür)
 );
