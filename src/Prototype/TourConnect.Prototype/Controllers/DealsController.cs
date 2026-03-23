@@ -11,20 +11,11 @@ public class DealsController : ControllerBase
 
     public DealsController(AppDbContext db) => _db = db;
 
-    // GET /api/deals → sadece Active deal'leri döndür, önce expired olanları işaretle
+    // GET /api/deals → sadece Active deal'leri döndür.
+    // Expiry kontrolü artık burada değil — DealExpiryService arka planda hallediyor.
     [HttpGet]
     public async Task<IActionResult> GetActive()
     {
-        var expiredDeals = await _db.Deals
-            .Where(d => d.ExpiresAt < DateTime.UtcNow && d.Status == DealStatus.Active)
-            .ToListAsync();
-
-        foreach (var deal in expiredDeals)
-            deal.Status = DealStatus.Expired;
-
-        if (expiredDeals.Count > 0)
-            await _db.SaveChangesAsync();
-
         var activeDeals = await _db.Deals
             .Where(d => d.Status == DealStatus.Active)
             .Include(d => d.Tour)

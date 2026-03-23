@@ -31,13 +31,6 @@ public class ReservationsController : ControllerBase
         if (deal.Status != DealStatus.Active)
             return BadRequest($"Bu deal rezervasyon kabul etmiyor. Durum: {deal.Status}");
 
-        if (deal.ExpiresAt <= DateTime.UtcNow)
-        {
-            deal.Status = DealStatus.Expired;
-            await _db.SaveChangesAsync();
-            return BadRequest("Deal süresi dolmuş.");
-        }
-
         var partner = await _db.Partners.FindAsync(request.PartnerId);
         if (partner is null)
             return NotFound($"Partner bulunamadı: {request.PartnerId}");

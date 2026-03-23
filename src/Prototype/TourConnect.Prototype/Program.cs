@@ -3,6 +3,7 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using TourConnect.Prototype.Data;
 using TourConnect.Prototype.Middleware;
+using TourConnect.Prototype.Services;
 using TourConnect.Prototype.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +30,10 @@ builder.Services.AddSwaggerGen();
 // validation başarısız olunca controller method'u çalışmaz, otomatik 400 döner.
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateDealValidator>();
+
+// AddHostedService: background service'i DI container'a kaydet.
+// Uygulama başlayınca otomatik başlar, kapanınca durur.
+builder.Services.AddHostedService<DealExpiryService>();
 
 // EF Core + PostgreSQL
 // GetConnectionString("DefaultConnection") → appsettings.json'daki
