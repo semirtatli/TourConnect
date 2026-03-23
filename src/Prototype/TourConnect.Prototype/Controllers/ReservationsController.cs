@@ -26,17 +26,17 @@ public class ReservationsController : ControllerBase
     {
         var deal = await _db.Deals.FindAsync(request.DealId);
         if (deal is null)
-            return NotFound($"Deal bulunamadı: {request.DealId}");
+            return Problem(detail: $"Deal bulunamadı: {request.DealId}", statusCode: 404);
 
         if (deal.Status != DealStatus.Active)
-            return BadRequest($"Bu deal rezervasyon kabul etmiyor. Durum: {deal.Status}");
+            return Problem(detail: $"Bu deal rezervasyon kabul etmiyor. Durum: {deal.Status}", statusCode: 400);
 
         var partner = await _db.Partners.FindAsync(request.PartnerId);
         if (partner is null)
-            return NotFound($"Partner bulunamadı: {request.PartnerId}");
+            return Problem(detail: $"Partner bulunamadı: {request.PartnerId}", statusCode: 404);
 
         if (deal.AvailableSlots < request.GuestCount)
-            return BadRequest($"Yeterli slot yok. İstenen: {request.GuestCount}, Mevcut: {deal.AvailableSlots}");
+            return Problem(detail: $"Yeterli slot yok. İstenen: {request.GuestCount}, Mevcut: {deal.AvailableSlots}", statusCode: 400);
 
         deal.AvailableSlots -= request.GuestCount;
 

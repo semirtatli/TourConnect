@@ -23,6 +23,14 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// CORS: tarayıcı farklı origin'den (localhost:3000) istek yaparken bloklanmasın.
+// React frontend'in API'ye erişebilmesi için gerekli.
+builder.Services.AddCors(options =>
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins("http://localhost:3000", "http://localhost:3001")
+              .AllowAnyMethod()
+              .AllowAnyHeader()));
+
 // FluentValidation: tüm validator sınıflarını otomatik bul ve kaydet.
 // AddValidatorsFromAssemblyContaining → belirtilen sınıfın bulunduğu assembly'deki
 // tüm AbstractValidator<T> sınıflarını tarar.
@@ -53,6 +61,7 @@ if (app.Environment.IsDevelopment())
 // Exception middleware'i pipeline'ın en başına ekle.
 // En başta olması gerekiyor: sonraki tüm middleware ve controller'ların
 // fırlattığı exception'ları yakalamak için.
+app.UseCors();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Migration'ları uygula (uygulama her başladığında)

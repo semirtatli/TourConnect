@@ -31,7 +31,7 @@ public class DealsController : ControllerBase
     {
         var tour = await _db.Tours.FindAsync(request.TourId);
         if (tour is null)
-            return NotFound($"Tur bulunamadı: {request.TourId}");
+            return Problem(detail: $"Tur bulunamadı: {request.TourId}", statusCode: 404);
 
         // Input validation'lar FluentValidation tarafından yapıldı.
         // Buraya gelindiyse tüm alanlar geçerli demektir.
@@ -59,10 +59,10 @@ public class DealsController : ControllerBase
     {
         var deal = await _db.Deals.FindAsync(id);
         if (deal is null)
-            return NotFound($"Deal bulunamadı: {id}");
+            return Problem(detail: $"Deal bulunamadı: {id}", statusCode: 404);
 
         if (deal.Status != DealStatus.Active)
-            return BadRequest($"Bu deal iptal edilemez. Mevcut durum: {deal.Status}");
+            return Problem(detail: $"Bu deal iptal edilemez. Mevcut durum: {deal.Status}", statusCode: 400);
 
         deal.Status = DealStatus.Cancelled;
         await _db.SaveChangesAsync();
