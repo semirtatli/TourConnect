@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using TourConnect.Prototype.Data;
+using TourConnect.Prototype.Middleware;
 using TourConnect.Prototype.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,6 +44,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Exception middleware'i pipeline'ın en başına ekle.
+// En başta olması gerekiyor: sonraki tüm middleware ve controller'ların
+// fırlattığı exception'ları yakalamak için.
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Migration'ları uygula (uygulama her başladığında)
 using (var scope = app.Services.CreateScope())
