@@ -28,7 +28,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: src/Prototype/TourConnect.Prototype/Dockerfile
+      dockerfile: src/Monolith/TourConnect.API/Dockerfile
     ports:
       - "8080:8080"
     environment:
