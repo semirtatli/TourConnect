@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using TourConnect.TourService.Data;
+using TourConnect.TourService.Infrastructure.Data;
 
 #nullable disable
 
@@ -22,7 +22,7 @@ namespace TourConnect.TourService.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("TourConnect.TourService.Entities.Deal", b =>
+            modelBuilder.Entity("TourConnect.TourService.Domain.Entities.Deal", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -59,7 +59,7 @@ namespace TourConnect.TourService.Migrations
                     b.ToTable("Deals");
                 });
 
-            modelBuilder.Entity("TourConnect.TourService.Entities.Operator", b =>
+            modelBuilder.Entity("TourConnect.TourService.Domain.Entities.Operator", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -85,7 +85,7 @@ namespace TourConnect.TourService.Migrations
                     b.ToTable("Operators");
                 });
 
-            modelBuilder.Entity("TourConnect.TourService.Entities.Tour", b =>
+            modelBuilder.Entity("TourConnect.TourService.Domain.Entities.Tour", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -122,9 +122,9 @@ namespace TourConnect.TourService.Migrations
                     b.ToTable("Tours");
                 });
 
-            modelBuilder.Entity("TourConnect.TourService.Entities.Deal", b =>
+            modelBuilder.Entity("TourConnect.TourService.Domain.Entities.Deal", b =>
                 {
-                    b.HasOne("TourConnect.TourService.Entities.Tour", "Tour")
+                    b.HasOne("TourConnect.TourService.Domain.Entities.Tour", "Tour")
                         .WithMany("Deals")
                         .HasForeignKey("TourId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -133,9 +133,9 @@ namespace TourConnect.TourService.Migrations
                     b.Navigation("Tour");
                 });
 
-            modelBuilder.Entity("TourConnect.TourService.Entities.Tour", b =>
+            modelBuilder.Entity("TourConnect.TourService.Domain.Entities.Tour", b =>
                 {
-                    b.HasOne("TourConnect.TourService.Entities.Operator", "Operator")
+                    b.HasOne("TourConnect.TourService.Domain.Entities.Operator", "Operator")
                         .WithMany("Tours")
                         .HasForeignKey("OperatorId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -144,12 +144,12 @@ namespace TourConnect.TourService.Migrations
                     b.Navigation("Operator");
                 });
 
-            modelBuilder.Entity("TourConnect.TourService.Entities.Operator", b =>
+            modelBuilder.Entity("TourConnect.TourService.Domain.Entities.Operator", b =>
                 {
                     b.Navigation("Tours");
                 });
 
-            modelBuilder.Entity("TourConnect.TourService.Entities.Tour", b =>
+            modelBuilder.Entity("TourConnect.TourService.Domain.Entities.Tour", b =>
                 {
                     b.Navigation("Deals");
                 });

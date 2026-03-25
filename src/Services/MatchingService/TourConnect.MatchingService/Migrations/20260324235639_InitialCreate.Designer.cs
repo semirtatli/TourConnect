@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using TourConnect.MatchingService.Data;
+using TourConnect.MatchingService.Infrastructure.Data;
 
 #nullable disable
 
@@ -25,7 +25,7 @@ namespace TourConnect.MatchingService.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("TourConnect.MatchingService.Entities.Partner", b =>
+            modelBuilder.Entity("TourConnect.MatchingService.Domain.Entities.Partner", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -51,7 +51,7 @@ namespace TourConnect.MatchingService.Migrations
                     b.ToTable("Partners");
                 });
 
-            modelBuilder.Entity("TourConnect.MatchingService.Entities.Reservation", b =>
+            modelBuilder.Entity("TourConnect.MatchingService.Domain.Entities.Reservation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -86,9 +86,9 @@ namespace TourConnect.MatchingService.Migrations
                     b.ToTable("Reservations");
                 });
 
-            modelBuilder.Entity("TourConnect.MatchingService.Entities.Reservation", b =>
+            modelBuilder.Entity("TourConnect.MatchingService.Domain.Entities.Reservation", b =>
                 {
-                    b.HasOne("TourConnect.MatchingService.Entities.Partner", "Partner")
+                    b.HasOne("TourConnect.MatchingService.Domain.Entities.Partner", "Partner")
                         .WithMany("Reservations")
                         .HasForeignKey("PartnerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -97,7 +97,7 @@ namespace TourConnect.MatchingService.Migrations
                     b.Navigation("Partner");
                 });
 
-            modelBuilder.Entity("TourConnect.MatchingService.Entities.Partner", b =>
+            modelBuilder.Entity("TourConnect.MatchingService.Domain.Entities.Partner", b =>
                 {
                     b.Navigation("Reservations");
                 });

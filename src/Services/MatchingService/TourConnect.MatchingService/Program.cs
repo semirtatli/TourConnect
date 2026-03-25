@@ -1,50 +1,34 @@
-using EventBus.Messages.Events;
-using MassTransit;
+using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Text.Json.Serialization;
-using TourConnect.MatchingService.Consumers;
-using TourConnect.MatchingService.Data;
-using TourConnect.MatchingService.Entities;
+using TourConnect.MatchingService.Application;
+using TourConnect.MatchingService.Application.DTOs;
+using TourConnect.MatchingService.Application.Partners.Commands;
+using TourConnect.MatchingService.Application.Partners.Queries;
+using TourConnect.MatchingService.Application.Reservations.Commands;
+using TourConnect.MatchingService.Application.Reservations.Queries;
+using TourConnect.MatchingService.Infrastructure;
+using TourConnect.MatchingService.Infrastructure.Data;
+using TourConnect.MatchingService.Infrastructure.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// IgnoreCycles: Reservation→Partner→Reservations→Partner şeklindeki döngüyü kırar.
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
-// --- VERİTABANI ---
-builder.Services.AddDbContext<MatchingDbContext>(opt =>
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// --- Clean Architecture DI ---
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 // --- HEALTH CHECKS ---
-// DB: EF Core üzerinden SELECT 1 çalıştırır.
-// masstransit-bus: MassTransit RabbitMQ bağlantısını otomatik olarak ekler.
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<MatchingDbContext>("database");
-
-// --- MASSTRANSIT + RABBITMQ ---
-builder.Services.AddMassTransit(x =>
-{
-    // Matching Service iki event dinler: Confirmed ve Rejected
-    x.AddConsumer<ReservationConfirmedConsumer>();
-    x.AddConsumer<ReservationRejectedConsumer>();
-
-    x.UsingRabbitMq((ctx, cfg) =>
-    {
-        cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
-        {
-            h.Username(builder.Configuration["RabbitMQ:Username"]!);
-            h.Password(builder.Configuration["RabbitMQ:Password"]!);
-        });
-
-        cfg.ConfigureEndpoints(ctx);
-    });
-});
 
 var app = builder.Build();
 
@@ -54,9 +38,23 @@ app.UseSwaggerUI();
 // --- GLOBAL EXCEPTION HANDLER ---
 app.UseExceptionHandler(errorApp => errorApp.Run(async ctx =>
 {
-    ctx.Response.StatusCode = 500;
     ctx.Response.ContentType = "application/json";
-    await ctx.Response.WriteAsJsonAsync(new { error = "Sunucu hatası." });
+
+    var exception = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+    if (exception is ValidationException validationEx)
+    {
+        ctx.Response.StatusCode = 400;
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            error = "Doğrulama hatası.",
+            details = validationEx.Errors.Select(e => new { e.PropertyName, e.ErrorMessage })
+        });
+    }
+    else
+    {
+        ctx.Response.StatusCode = 500;
+        await ctx.Response.WriteAsJsonAsync(new { error = "Sunucu hatası." });
+    }
 }));
 
 // --- MİGRASYON + SEED ---
@@ -64,72 +62,41 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<MatchingDbContext>();
     db.Database.Migrate();
-
-    // Sabit GUID'ler Monolith seed'iyle birebir aynı — sistemler arası tutarlılık.
-    var partner1Id = Guid.Parse("d1000000-0000-0000-0000-000000000001");
-    if (!await db.Partners.AnyAsync(p => p.Id == partner1Id))
-    {
-        var seededAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        db.Partners.AddRange(
-            new Partner { Id = partner1Id,                                          Name = "Grand Hotel Bodrum",   ContactEmail = "concierge@grandhotelbodrum.com", Location = "Bodrum",  CreatedAt = seededAt },
-            new Partner { Id = Guid.Parse("d2000000-0000-0000-0000-000000000002"), Name = "Antalya Palace Hotel", ContactEmail = "tours@antalyapalace.com",        Location = "Antalya", CreatedAt = seededAt }
-        );
-        await db.SaveChangesAsync();
-    }
+    await MatchingServiceSeed.SeedAsync(db);
 }
 
 // =====================================================================
-// ENDPOINTS
+// ENDPOINTS — iş mantığı Application katmanında, burada sadece mapping
 // =====================================================================
 
 var partners = app.MapGroup("/api/partners");
 
-partners.MapGet("/", async (MatchingDbContext db) =>
-    Results.Ok(await db.Partners.ToListAsync()));
+partners.MapGet("/", async (IMediator mediator) =>
+    Results.Ok(await mediator.Send(new GetPartnersQuery())));
 
-partners.MapPost("/", async (MatchingDbContext db, Partner partner) =>
+partners.MapPost("/", async (IMediator mediator, CreatePartnerDto dto) =>
 {
-    partner.Id = Guid.NewGuid();
-    db.Partners.Add(partner);
-    await db.SaveChangesAsync();
-    return Results.Created($"/api/partners/{partner.Id}", partner);
+    var result = await mediator.Send(new CreatePartnerCommand(dto));
+    return Results.Created($"/api/partners/{result.Id}", result);
 });
 
 var reservations = app.MapGroup("/api/reservations");
 
-reservations.MapGet("/", async (MatchingDbContext db) =>
-    Results.Ok(await db.Reservations.Include(r => r.Partner).ToListAsync()));
+reservations.MapGet("/", async (IMediator mediator) =>
+    Results.Ok(await mediator.Send(new GetReservationsQuery())));
 
-reservations.MapGet("/{id:guid}", async (MatchingDbContext db, Guid id) =>
+reservations.MapGet("/{id:guid}", async (IMediator mediator, Guid id) =>
 {
-    var reservation = await db.Reservations.FindAsync(id);
-    return reservation is null ? Results.NotFound() : Results.Ok(reservation);
+    var result = await mediator.Send(new GetReservationByIdQuery(id));
+    return result is null ? Results.NotFound() : Results.Ok(result);
 });
 
-reservations.MapPost("/", async (MatchingDbContext db, IPublishEndpoint publish, Reservation reservation) =>
+reservations.MapPost("/", async (IMediator mediator, CreateReservationDto dto) =>
 {
-    var partnerExists = await db.Partners.AnyAsync(p => p.Id == reservation.PartnerId);
-    if (!partnerExists) return Results.NotFound("Partner bulunamadı.");
-
-    // Rezervasyonu Pending olarak kaydet
-    reservation.Id = Guid.NewGuid();
-    reservation.Status = ReservationStatus.Pending;
-    db.Reservations.Add(reservation);
-    await db.SaveChangesAsync();
-
-    // ReservationRequestedEvent yayınla → Tour Service dinliyor
-    // HTTP çağrısı yok — sadece event. Tour Service çökmüş olsa bile bu satır başarılı olur.
-    await publish.Publish(new ReservationRequestedEvent(
-        EventId: Guid.NewGuid(),
-        CreatedAt: DateTime.UtcNow,
-        ReservationId: reservation.Id,
-        DealId: reservation.DealId,
-        PartnerId: reservation.PartnerId,
-        GuestName: reservation.GuestName,
-        GuestCount: reservation.GuestCount));
-
-    // 202 Accepted: iş henüz bitmedi, ama kabul edildi
-    return Results.Accepted($"/api/reservations/{reservation.Id}", reservation);
+    var result = await mediator.Send(new CreateReservationCommand(dto));
+    return result is null
+        ? Results.NotFound("Partner bulunamadı.")
+        : Results.Accepted($"/api/reservations/{result.Id}", result);
 });
 
 app.MapHealthChecks("/health", new HealthCheckOptions
