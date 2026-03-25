@@ -33,12 +33,12 @@ public class CreateReservationHandler : IRequestHandler<CreateReservationCommand
         var deal = await _db.Deals.FindAsync([cmd.DealId], ct)
             ?? throw new KeyNotFoundException($"Deal bulunamadı: {cmd.DealId}");
 
-        if (deal.Status != DealStatus.Active)
-            throw new InvalidOperationException($"Bu deal rezervasyon kabul etmiyor. Durum: {deal.Status}");
-
         var partnerExists = await _db.Partners.AnyAsync(p => p.Id == cmd.PartnerId, ct);
         if (!partnerExists)
             throw new KeyNotFoundException($"Partner bulunamadı: {cmd.PartnerId}");
+
+        if (deal.Status != DealStatus.Active)
+            throw new InvalidOperationException($"Bu deal rezervasyon kabul etmiyor. Durum: {deal.Status}");
 
         if (deal.AvailableSlots < cmd.GuestCount)
             throw new InvalidOperationException($"Yeterli slot yok. İstenen: {cmd.GuestCount}, Mevcut: {deal.AvailableSlots}");

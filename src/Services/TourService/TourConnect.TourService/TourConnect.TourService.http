@@ -1,0 +1,6 @@
+@TourConnect.TourService_HostAddress = http://localhost:5025
+
+GET {{TourConnect.TourService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

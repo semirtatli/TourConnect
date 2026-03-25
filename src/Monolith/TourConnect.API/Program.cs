@@ -1,7 +1,9 @@
 using System.Text.Json.Serialization;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TourConnect.Application;
 using TourConnect.Application.Operators;
 using TourConnect.Infrastructure.BackgroundServices;
@@ -14,7 +16,8 @@ var builder = WebApplication.CreateBuilder(args);
 // AddControllers: [ApiController] sınıflarını bulur ve endpoint olarak kaydeder.
 // ReferenceHandler.IgnoreCycles: döngüsel referansları yok say
 // (Tour → Operator → Tours → Tour → ... sonsuz döngüsünü önler)
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+        options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true)
     .AddJsonOptions(o =>
         o.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
@@ -44,6 +47,11 @@ builder.Services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbConte
 // --- BACKGROUND SERVICE ---
 builder.Services.AddHostedService<DealExpiryService>();
 
+// --- HEALTH CHECKS ---
+// AddDbContextCheck: AppDbContext üzerinden SELECT 1 çalıştırarak DB'nin ayakta olduğunu doğrular.
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database");
+
 // --- CORS ---
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
@@ -66,13 +74,33 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// --- MİGRASYON ---
-// Uygulama her başladığında bekleyen migration'ları uygula.
+// --- MİGRASYON + SEED ---
+// Migration: bekleyen değişiklikleri DB'ye uygula.
+// Seed: DB boşsa örnek veri ekle (sabit GUID'ler sayesinde idempotent).
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+    await SeedData.SeedAsync(db);
 }
 
 app.MapControllers();
+
+// --- HEALTH CHECK ENDPOINT ---
+// /health: tüm bağımlılıkların durumunu JSON olarak döner.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (ctx, report) =>
+    {
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.ToDictionary(
+                e => e.Key,
+                e => e.Value.Status.ToString())
+        });
+    }
+});
+
 app.Run();

@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd /c \"taskkill /F /PID 20888\")",
+      "Bash(cmd /c \"tasklist | findstr /i \\\\\"tourconnect dotnet\\\\\"\" 2>&1)",
+      "Bash(dotnet build:*)",
+      "Bash(cmd /c \"tasklist /FI \\\\\"PID eq 20888\\\\\" 2>&1\")",
+      "Bash(cmd /c \"tasklist /FI \\\\\"PID eq 20888\\\\\" /NH 2>&1\")",
+      "Bash(cmd /c \"tasklist /FI \"\"PID eq 20888\"\" /NH\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(cmd /c tasklist /NH /FI \"PID eq 20888\" 2>&1)",
+      "Bash(cmd /c tasklist /NH)",
+      "Bash(cmd /c \"taskkill /F /IM TourConnect.Prototype.exe & taskkill /F /IM dotnet.exe\" 2>&1)",
+      "Bash(cmd /c \"wmic process where ProcessId=20888 get Name,ProcessId,ExecutablePath 2>&1\")",
+      "Bash(cmd /c \"wmic process where \\\\\"name like '%TourConnect%' or name like '%dotnet%'\\\\\" get Name,ProcessId,ExecutablePath 2>&1\")",
+      "Bash(powershell -Command \"Get-Process | Where-Object {$_.Name -like '*TourConnect*' -or $_.Name -like '*dotnet*'} | Select-Object Id,Name,Path | Format-List\")",
+      "Bash(docker-compose up:*)",
+      "Bash(curl -s http://localhost:8080/api/operators)",
+      "Bash(curl -s -X POST http://localhost:8080/api/operators -H \"Content-Type: application/json\" -d '{\"\"name\"\":\"\"Deniz Turları\"\",\"\"phone\"\":\"\"05551234567\"\",\"\"location\"\":\"\"Bodrum\"\",\"\"isActive\"\":true}')",
+      "Bash(curl -s -X POST http://localhost:8080/api/operators -H \"Content-Type: application/json\" -d '{\"\"Name\"\":\"\"Deniz Turları\"\",\"\"Phone\"\":\"\"05551234567\"\",\"\"Location\"\":\"\"Bodrum\"\"}')",
+      "Bash(curl -s -X POST http://localhost:8080/api/operators -H \"Content-Type: application/json\" -d '{\"\"name\"\":\"\"Deniz Turları\"\",\"\"phone\"\":\"\"05551234567\"\",\"\"location\"\":\"\"Bodrum\"\"}')",
+      "Bash(curl -s -X POST http://localhost:8080/api/operators -H \"Content-Type: application/json; charset=utf-8\" -d \"{\"\"name\"\":\"\"Test\"\",\"\"phone\"\":\"\"05551234567\"\",\"\"location\"\":\"\"Bodrum\"\"}\")",
+      "Bash(docker-compose down:*)",
+      "Bash(npm --version)",
+      "Bash(npm install:*)",
+      "Bash(curl -s http://localhost:8080/api/deals)",
+      "Bash(npm run:*)",
+      "Bash(curl -s -I -X OPTIONS http://localhost:8080/api/deals -H \"Origin: http://localhost:3000\" -H \"Access-Control-Request-Method: GET\")",
+      "Bash(curl -s -X POST http://localhost:8080/api/reservations -H \"Content-Type: application/json\" -d \"{\"\"dealId\"\":\"\"00000000-0000-0000-0000-000000000000\"\",\"\"partnerId\"\":\"\"00000000-0000-0000-0000-000000000000\"\",\"\"guestName\"\":\"\"Test\"\",\"\"guestCount\"\":1}\")",
+      "Bash(curl:*)",
+      "Bash(docker-compose -f docker-compose.microservices.yml build)",
+      "Bash(docker-compose -f docker-compose.microservices.yml build --no-cache gateway)",
+      "Bash(docker-compose -f docker-compose.microservices.yml up -d gateway)",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s \"http://localhost:5000/health\")",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -w \"\\\\nHTTP:%{http_code}\" \"http://localhost:5000/health\")",
+      "Bash(docker exec:*)",
+      "Bash(docker build:*)",
+      "Bash(dotnet test:*)"
+    ]
+  }
+}
