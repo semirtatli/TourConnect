@@ -1,195 +1,200 @@
 # TourConnect
 
-Last-minute tur eşleştirme platformu. Tur operatörleri dolmayan kontenjanlarını fırsat (deal) olarak girer; partner oteller bu fırsatları görüp misafirlerine sunar ve rezervasyon oluşturur.
+Otel partnerlerinin son dakika tur fırsatlarını rezerve edebildiği bir platform. Tur operatörleri dolmayan kontenjanlarını indirimli deal olarak girer, partner oteller bu deal'leri misafirlerine sunar ve rezervasyon oluşturur.
 
----
+## Ne yapar?
 
-## Mimari Yolculuk
+- Tur operatörleri sisteme kayıt olur, tur ekler, dolmayan turları indirimli deal olarak yayınlar.
+- Otel partnerleri aktif deal'leri görür ve misafirleri için rezervasyon oluşturur.
+- Rezervasyon oluşturulduğunda `Pending` durumunda kaydedilir. Arka planda Tour Service slot kontrolü yapar ve `Confirmed` ya da `Cancelled` olarak günceller.
 
-Bu proje, yazılım mimarisinin evrimini bizzat yaşayarak öğrenmek için tasarlandı. Her faz bir öncekinin üzerine inşa edildi:
-
-| Faz | Açıklama | Teknoloji |
-|-----|----------|-----------|
-| **0 — Prototip** | Tek dosya, sıfır pattern | Minimal API, SQLite |
-| **1 — Monolith** | Controller'lar, validasyon, Docker | PostgreSQL, FluentValidation |
-| **2 — Clean Architecture** | Katmanlı mimari, CQRS | MediatR, xUnit |
-| **3 — HTTP Mikroservisler** | İki servis, HTTP haberleşmesi | HttpClient, YARP |
-| **4 — Event-Driven** | Asenkron iletişim, saga, cache | RabbitMQ, MassTransit, Redis |
-| **5 — Prod'a Hazır** | Seed data, health checks, CI/CD | GitHub Actions |
-
----
-
-## Proje Yapısı
+## Mimari
 
 ```
-TourConnect/
-├── src/
-│   ├── Prototype/               # Faz 0: SQLite + Minimal API
-│   ├── Monolith/                # Faz 1-2: Clean Architecture
-│   │   ├── TourConnect.Domain
-│   │   ├── TourConnect.Application
-│   │   ├── TourConnect.Infrastructure
-│   │   ├── TourConnect.API
-│   │   └── TourConnect.Application.Tests
-│   ├── Services/                # Faz 3-4: Mikroservisler
-│   │   ├── TourService/
-│   │   └── MatchingService/
-│   ├── Gateway/                 # YARP reverse proxy
-│   └── BuildingBlocks/          # Paylaşılan event'ler ve tipler
-├── docker-compose.yml           # Monolith ortamı
-└── docker-compose.microservices.yml  # Mikroservis ortamı
+[React Frontend]
+       |
+  [YARP Gateway :5000]
+       |                   \
+[Tour Service :5001]   [Matching Service :5002]
+  Operators                 Partners
+  Tours                     Reservations
+  Deals (Redis cache)
+       |                         |
+ [PostgreSQL :5436]       [PostgreSQL :5437]
+       |                         |
+       +----------[RabbitMQ]-----+
 ```
 
----
+Gateway hangi isteği nereye yönlendiriyor:
+
+| Path | Servis |
+|---|---|
+| `/api/operators`, `/api/tours`, `/api/deals` | Tour Service |
+| `/api/partners`, `/api/reservations` | Matching Service |
+
+## Rezervasyon nasıl işliyor?
+
+```
+Otel partneri  →  POST /api/reservations
+                        ↓
+             Matching Service rezervasyonu kaydeder  (Status: Pending)
+                        ↓  ReservationRequestedEvent yayınlar
+             Tour Service slot kontrolü yapar
+                 ├── slot var    →  ReservationConfirmedEvent
+                 └── slot yok   →  ReservationRejectedEvent
+                        ↓
+             Matching Service durumu günceller
+                 ├── Status: Confirmed
+                 └── Status: Cancelled
+```
+
+`POST /api/reservations` direkt `202 Accepted` döner. Sonucu `GET /api/reservations/{id}` ile kontrol edebilirsiniz.
+
+## Teknolojiler
+
+| | |
+|---|---|
+| Backend | .NET 8, ASP.NET Core Minimal API |
+| Mimari | Clean Architecture (Domain / Application / Infrastructure) |
+| CQRS | MediatR |
+| Validasyon | FluentValidation |
+| ORM | Entity Framework Core 8 + Npgsql |
+| Mesajlaşma | MassTransit + RabbitMQ |
+| Cache | Redis (aktif deal'ler, 60 saniyelik TTL) |
+| Gateway | YARP |
+| Frontend | React + Vite + Tailwind CSS |
+| Veritabanı | PostgreSQL 15 (her serviste ayrı DB) |
+| Container | Docker + Docker Compose |
+| CI/CD | GitHub Actions |
+| Test | xUnit |
 
 ## Çalıştırma
 
-### Gereksinimler
+### Gereksinim
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- `.env` dosyası (ilk kurulumda oluşturulmalı)
 
-```bash
-cp .env.example .env
-```
+### 1. `.env` dosyası oluştur
 
-`.env` içine `POSTGRES_DB` ekleyin:
+Proje kökünde (`.sln` ile aynı yerde) bir `.env` dosyası oluştur:
 
 ```env
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
+POSTGRES_USER=your_db_user
+POSTGRES_PASSWORD=your_db_password
 POSTGRES_DB=tourconnect
-
-RABBITMQ_USER=guest
-RABBITMQ_PASSWORD=guest
+RABBITMQ_USER=your_rabbitmq_user
+RABBITMQ_PASSWORD=your_rabbitmq_password
 ```
 
----
+Bu dosya `.gitignore`'da, commit edilmez.
 
-### Monolith (Faz 1-2)
-
-```bash
-docker compose up --build
-```
-
-| Servis | URL |
-|--------|-----|
-| API | http://localhost:8080 |
-| Swagger | http://localhost:8080/swagger |
-| Health | http://localhost:8080/health |
-| PostgreSQL | localhost:5435 |
-
----
-
-### Mikroservisler (Faz 4)
+### 2. Mikroservisleri başlat
 
 ```bash
 docker compose -f docker-compose.microservices.yml up --build
 ```
 
-| Servis | URL |
-|--------|-----|
+İlk açılışta migration'lar ve seed data otomatik çalışır. Servisler ayağa kalktıktan sonra:
+
+| | URL |
+|---|---|
 | Gateway | http://localhost:5000 |
-| Tour Service | http://localhost:5001 |
-| Matching Service | http://localhost:5002 |
-| RabbitMQ Yönetim | http://localhost:15672 (guest/guest) |
-| Health — Tour Service | http://localhost:5001/health |
-| Health — Matching Service | http://localhost:5002/health |
+| Tour Service Swagger | http://localhost:5001/swagger |
+| Matching Service Swagger | http://localhost:5002/swagger |
+| RabbitMQ Yönetim | http://localhost:15672 |
 
----
+### 3. (İsteğe bağlı) Monolith sürümünü başlat
 
-## API
-
-### Monolith Endpoint'leri
-
-#### Operatörler
-```
-GET  /api/operators          → Tüm operatörleri listele
-POST /api/operators          → Yeni operatör oluştur
-```
-```json
-{ "name": "Aegean Blue Tours", "phone": "+90 252 316 4500", "location": "Bodrum" }
+```bash
+docker compose up --build
 ```
 
-#### Turlar
-```
-GET  /api/tours              → Tüm turları listele
-POST /api/tours              → Yeni tur oluştur
-```
-```json
-{ "operatorId": "...", "title": "Bodrum Tekne Turu", "description": "...", "category": 0, "durationInHours": 8, "basePrice": 500 }
-```
-> Kategoriler: `0` BoatTour · `1` Safari · `2` Diving · `3` Cultural · `4` Adventure · `5` Food
+| | URL |
+|---|---|
+| Swagger | http://localhost:8080/swagger |
+| Health | http://localhost:8080/health |
 
-#### Deal'lar
-```
-GET  /api/deals              → Aktif deal'leri listele
-POST /api/deals              → Yeni deal oluştur
-PUT  /api/deals/{id}/cancel  → Deal'i iptal et
-```
-```json
-{ "tourId": "...", "availableSlots": 8, "originalPrice": 500, "discountedPrice": 350, "expiresAt": "2026-06-30T23:59:59Z" }
+### 4. (İsteğe bağlı) Frontend'i başlat
+
+```bash
+cd src/WebApp/tourconnect-frontend
+npm install
+npm run dev
 ```
 
-#### Partner'lar
-```
-GET  /api/partners           → Tüm partner'ları listele
-POST /api/partners           → Yeni partner oluştur
-```
-```json
-{ "name": "Grand Hotel Bodrum", "contactEmail": "info@grandhotel.com", "location": "Bodrum" }
-```
+http://localhost:5173 adresinde açılır.
 
-#### Rezervasyonlar
-```
-GET  /api/reservations       → Tüm rezervasyonları listele
-POST /api/reservations       → Rezervasyon oluştur
-```
-```json
-{ "dealId": "...", "partnerId": "...", "guestName": "Ali Yılmaz", "guestCount": 3 }
-```
+## Endpoint'ler
 
-### Mikroservis Endpoint'leri (Gateway üzerinden)
+Aşağıdaki istekler gateway üzerinden (`:5000`) gider. Servislere doğrudan da bağlanabilirsiniz.
 
-Gateway (:5000), gelen isteği path'e göre doğru servise yönlendirir:
-
-| Path | Yönlendirme |
-|------|-------------|
-| `/api/operators/*`, `/api/tours/*`, `/api/deals/*` | Tour Service (:5001) |
-| `/api/partners/*`, `/api/reservations/*` | Matching Service (:5002) |
-
-Mikroservis rezervasyonu **asenkron** çalışır: `POST /api/reservations` → `202 Accepted` döner, arka planda saga tamamlanır.
-
----
-
-## Rezervasyon Saga'sı (Faz 4)
+**Tour Service**
 
 ```
-Matching Service          RabbitMQ              Tour Service
-     │                       │                       │
-     │── ReservationRequested ──────────────────────>│
-     │                       │     slot kontrolü     │
-     │<─ ReservationConfirmed ──────────────────────│  (yeterli slot)
-     │<─ ReservationRejected  ──────────────────────│  (yetersiz slot)
-     │
-     │  Reservation.Status güncellenir
-     │  (Confirmed / Cancelled)
+GET  /api/operators      Tüm operatörler
+POST /api/operators      Operatör oluştur
+
+GET  /api/tours          Tüm turlar
+POST /api/tours          Tur oluştur
+
+GET  /api/deals          Aktif deal'ler (Redis cache, 60s)
+POST /api/deals          Deal oluştur
 ```
 
----
+**Matching Service**
 
-## Seed Data
+```
+GET  /api/partners           Tüm partnerlar
+POST /api/partners           Partner oluştur
 
-Her iki ortam da ilk başlatmada örnek veriyle gelir:
+GET  /api/reservations       Tüm rezervasyonlar
+GET  /api/reservations/{id}  Tek rezervasyon
+POST /api/reservations       Rezervasyon oluştur  →  202 Accepted
+```
 
-| Veri | İçerik |
-|------|--------|
-| Operatörler | Aegean Blue Tours (Bodrum), Mediterranean Adventures (Antalya) |
-| Turlar | Bodrum Tekne Turu, Bodrum Dalış Macerası, Belek Jeep Safari |
-| Deal'lar | 3 aktif deal (8, 4, 12 slot) |
-| Partner'lar | Grand Hotel Bodrum, Antalya Palace Hotel |
+### Hızlı örnek
 
----
+Aşağıdaki seed ID'leri her ortamda hazır gelir, direkt kullanabilirsin:
+
+```bash
+curl -X POST http://localhost:5000/api/reservations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dealId":    "c1000000-0000-0000-0000-000000000001",
+    "partnerId": "d1000000-0000-0000-0000-000000000001",
+    "guestName": "Ali Yılmaz",
+    "guestCount": 2
+  }'
+```
+
+## Seed data
+
+İlk başlatmada her iki servise de aşağıdaki veriler eklenir. ID'ler sabit, her ortamda aynı:
+
+| Tip | Ad | ID |
+|---|---|---|
+| Operator | Aegean Blue Tours | `a1000000-...` |
+| Operator | Mediterranean Adventures | `a2000000-...` |
+| Tour | Bodrum Tekne Turu | `b1000000-...` |
+| Tour | Dalış Macerası | `b2000000-...` |
+| Tour | Belek Jeep Safari | `b3000000-...` |
+| Deal | Tekne turu — 8 slot | `c1000000-...` |
+| Deal | Dalış — 4 slot | `c2000000-...` |
+| Deal | Jeep Safari — 12 slot | `c3000000-...` |
+| Partner | Grand Hotel Bodrum | `d1000000-...` |
+| Partner | Antalya Palace Hotel | `d2000000-...` |
+
+Deal'lerin expiry tarihi `2099-12-31`, yani hiç expire olmaz.
+
+## Health check
+
+```bash
+curl http://localhost:5001/health
+# {"status":"Healthy","checks":{"database":"Healthy","redis":"Healthy"}}
+
+curl http://localhost:5002/health
+# {"status":"Healthy","checks":{"database":"Healthy"}}
+```
 
 ## Testler
 
@@ -197,35 +202,47 @@ Her iki ortam da ilk başlatmada örnek veriyle gelir:
 dotnet test TourConnect.sln
 ```
 
-Monolith Application katmanı için 17 unit test bulunur (MediatR handler'ları ve FluentValidation validator'ları).
-
----
+Her iki servis için de MediatR handler'larını ve FluentValidation validator'larını kapsayan unit testler var.
 
 ## CI/CD
 
-Her `push` ve `pull_request` işleminde GitHub Actions otomatik olarak çalışır:
+`master`'a her push ve PR'da GitHub Actions çalışır:
 
-1. `.NET 8` + `.NET 10` kurulumu
-2. `dotnet restore`
-3. `dotnet build --configuration Release`
-4. `dotnet test --configuration Release`
+1. NuGet paketlerini restore et (`.csproj` hash'e göre cache'li)
+2. `dotnet build --configuration Release`
+3. `dotnet test --configuration Release`
 
-Workflow dosyası: `.github/workflows/ci.yml`
+Workflow: `.github/workflows/ci.yml`
 
----
+## Proje yapısı
 
-## Teknoloji Yığını
+```
+src/
+├── Prototype/               # tek dosya prototip (SQLite, pattern yok)
+├── Monolith/                # Clean Architecture monolith
+│   ├── TourConnect.Domain
+│   ├── TourConnect.Application
+│   ├── TourConnect.Infrastructure
+│   ├── TourConnect.API
+│   └── TourConnect.Application.Tests
+├── Services/
+│   ├── TourService/
+│   │   ├── TourConnect.TourService.Domain
+│   │   ├── TourConnect.TourService.Application
+│   │   ├── TourConnect.TourService.Infrastructure
+│   │   ├── TourConnect.TourService          ← giriş noktası
+│   │   └── TourConnect.TourService.Tests
+│   └── MatchingService/
+│       ├── TourConnect.MatchingService.Domain
+│       ├── TourConnect.MatchingService.Application
+│       ├── TourConnect.MatchingService.Infrastructure
+│       ├── TourConnect.MatchingService      ← giriş noktası
+│       └── TourConnect.MatchingService.Tests
+├── Gateway/
+│   └── TourConnect.Gateway                  ← YARP
+└── BuildingBlocks/
+    ├── Common/              ← BaseEntity, Result<T>
+    └── EventBus.Messages/   ← servisler arası paylaşılan event'ler
+```
 
-| Katman | Teknoloji |
-|--------|-----------|
-| Backend | .NET 8, ASP.NET Core |
-| ORM | Entity Framework Core 8, Npgsql |
-| Mesajlaşma | MassTransit, RabbitMQ |
-| Cache | Redis, StackExchange.Redis |
-| Gateway | YARP |
-| Validasyon | FluentValidation |
-| CQRS | MediatR |
-| Test | xUnit |
-| Frontend | React, Vite, Tailwind CSS |
-| Veritabanı | PostgreSQL |
-| Container | Docker, Docker Compose |
+Her servis Clean Architecture'a göre yapılandırılmış. `Application` katmanının framework bağımlılığı yok — sadece interface'ler, MediatR handler'ları ve FluentValidation validator'ları var.

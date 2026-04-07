@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel;
 using TourConnect.TourService.Application.DTOs;
 using TourConnect.TourService.Application.Interfaces;
 using TourConnect.TourService.Domain.Entities;
